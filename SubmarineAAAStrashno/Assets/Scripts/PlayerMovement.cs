@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -12,10 +13,13 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private bool canSprint = true;
     [SerializeField] private bool canCrouch = true;
     [SerializeField] private bool canUseHeadbob = true;
+    [SerializeField] private bool useStamin = true;
+    [SerializeField] private bool canInteract = true; 
 
     [Header("Controls")]
     [SerializeField] private KeyCode sprintKey = KeyCode.LeftShift;
     [SerializeField] private KeyCode crouchKey = KeyCode.C;
+    [SerializeField] private KeyCode interactKey = KeyCode.Mouse0;
 
     [Header("Movement Parameters")]
     [SerializeField] private float walkSpeed = 3;
@@ -28,6 +32,15 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField, Range(1, 10)] private float lookSpeedY = 2;
     [SerializeField, Range(1, 100)] private float upperLookLimint = 70;
     [SerializeField, Range(1, 100)] private float lowerLookLimint = 70;
+
+    [Header("Stamina Parameters")]
+    [SerializeField] private float maxStamina = 100;
+    [SerializeField] private float staminaUseMultiplier = 5;
+    [SerializeField] private float timeBeforeStamineRegenStarts = 5;
+    [SerializeField] private float staminaValueIncrement = 2;
+    [SerializeField] private float staminaTimeIncrement = 0.1f;
+    private float currentStamina;
+    private Coroutine regenirateStamina;
 
     [Header("Crouching Parameters")]
     [SerializeField] private float crouchHeight = 0.5f;
@@ -47,6 +60,7 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float crouchBobAmount = 0.025f;
     private float defaultYPos = 0;
     private float timer;
+    public static Action<float> OnStaminaChange;
 
     private Camera playerCam;
     private CharacterController characterController;
@@ -56,28 +70,38 @@ public class PlayerMovement : MonoBehaviour
 
     private float rotationX = 0;
 
+    [Header("Interaction")]
+    [SerializeField] private Vector3 interactionRayPoint = default;
+    [SerializeField] private float interactionDistance = default;
+    [SerializeField] private LayerMask interactionLayer = default;
+    private Interactible currentInteractible;
+
     private void Awake()
     {
         playerCam = GetComponentInChildren<Camera>();
         characterController = GetComponent<CharacterController>();
         defaultYPos = playerCam.transform.localPosition.y;
+        currentStamina = maxStamina;
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
 
     private void Update()
     {
-        if (CanMove)
+        if(CanMove)
         {
             HandleMovementInput();
             HandleMouseLook();
-            if (canCrouch)
-            {
+            if(canCrouch)
                 HandleCrouch();
-            }
-            if (canUseHeadbob)
-            {
+            if(canUseHeadbob)
                 HandleHeadBob();
+            if(useStamin)
+                HandleStamina();
+            if(canInteract)
+            {
+                HandleInteractionCheck();
+                HandlInteractionInput();
             }
             ApplyFinalMovement();
         }
@@ -102,19 +126,15 @@ public class PlayerMovement : MonoBehaviour
 
     private void HandleCrouch()
     {
-        if (ShouldCrouch)
-        {
+        if(ShouldCrouch)
             StartCoroutine(CrouchStand());
-        }
     }
 
     private void HandleHeadBob()
     {
-        if (!characterController.isGrounded)
-        {
+        if(!characterController.isGrounded)
             return;
-        }
-        if (Mathf.Abs(moveDirection.x) > 0.1f || Mathf.Abs(moveDirection.z) > 0.1f)
+        if(Mathf.Abs(moveDirection.x) > 0.1f || Mathf.Abs(moveDirection.z) > 0.1f)
         {
             timer += Time.deltaTime * (isCrouching ? crouchBobSpeed : isSpinting ? sprintBobSpeed : walkBobSpeed);
             playerCam.transform.localPosition = new Vector3(
@@ -125,21 +145,69 @@ public class PlayerMovement : MonoBehaviour
 
     }
 
+    private void HandleStamina()
+    {
+        if(isSpinting && currentInput != Vector2.zero)
+        {
+            if(regenirateStamina != null)
+            {
+                StopCoroutine(regenirateStamina);
+                regenirateStamina = null;
+            }
+
+            currentStamina -= staminaUseMultiplier * Time.deltaTime;
+
+            if(currentStamina < 0)
+                currentStamina = 0;
+
+            OnStaminaChange?.Invoke(currentStamina);
+
+            if(currentStamina <= 0)
+                canSprint = false;
+        }
+        if(!isSpinting && currentStamina < maxStamina && regenirateStamina == null)
+            regenirateStamina = StartCoroutine(RegenerateStamina());
+    }
+
+    private void HandleInteractionCheck()
+    {
+        if(Physics.Raycast(playerCam.ViewportPointToRay(interactionRayPoint), out RaycastHit hit, interactionDistance))
+        {
+            if(hit.collider.gameObject.layer == 6 && (currentInteractible == null || hit.collider.gameObject.GetInstanceID() != currentInteractible.GetInstanceID()))
+            {
+                hit.collider.TryGetComponent(out currentInteractible);
+
+                if(currentInteractible)
+                    currentInteractible.OnFocus();
+            }
+        }
+        else if(currentInteractible)
+        {
+            currentInteractible.OnLoseFocus();
+            currentInteractible = null;
+        }
+    }
+
+    private void HandlInteractionInput()
+    {
+        if(Input.GetKey(interactKey) && currentInteractible != null && Physics.Raycast(playerCam.ViewportPointToRay(interactionRayPoint), out RaycastHit hit, interactionDistance, interactionLayer))
+        {
+            currentInteractible.OnInteract();
+        }
+    }
+
     private void ApplyFinalMovement()
     {
         if (!characterController.isGrounded)
-        {
             moveDirection.y -= gravity * Time.deltaTime;
-        }
+
         characterController.Move(moveDirection * Time.deltaTime);
     }
 
     private IEnumerator CrouchStand()
     {
-        if (isCrouching && Physics.Raycast(playerCam.transform.position, Vector3.up))
-        {
+        if(isCrouching && Physics.Raycast(playerCam.transform.position, Vector3.up))
             yield break;
-        }
 
         duringCrouchingAnimation = true;
 
@@ -149,7 +217,7 @@ public class PlayerMovement : MonoBehaviour
         Vector3 targetCenter = isCrouching ? standingCenter : crouchingCenter;
         Vector3 currentCenter = characterController.center;
 
-        while (timeElaps < timeToCrouch)
+        while(timeElaps < timeToCrouch)
         {
             characterController.height = Mathf.Lerp(currentHeight, targetHeight, timeElaps / timeToCrouch);
             characterController.center = Vector3.Lerp(currentCenter, targetCenter, timeElaps / timeToCrouch);
@@ -163,5 +231,28 @@ public class PlayerMovement : MonoBehaviour
         isCrouching = !isCrouching;
 
         duringCrouchingAnimation = false;
+    }
+
+    private IEnumerator RegenerateStamina()
+    {
+        yield return new WaitForSeconds(timeBeforeStamineRegenStarts);
+        WaitForSeconds timeToWait = new WaitForSeconds(staminaTimeIncrement);
+
+        while(currentStamina < maxStamina)
+        {
+            if(currentStamina > 0 )
+                canSprint = true;
+
+            currentStamina += staminaValueIncrement;
+
+            if(currentStamina > maxStamina)
+                currentStamina = maxStamina;
+
+            OnStaminaChange?.Invoke(currentStamina);
+
+            yield return timeToWait;
+        }
+
+        regenirateStamina = null;
     }
 }
