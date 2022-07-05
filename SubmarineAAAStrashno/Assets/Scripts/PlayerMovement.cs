@@ -14,12 +14,10 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private bool canCrouch = true;
     [SerializeField] private bool canUseHeadbob = true;
     [SerializeField] private bool useStamin = true;
-    [SerializeField] private bool canInteract = true; 
 
     [Header("Controls")]
     [SerializeField] private KeyCode sprintKey = KeyCode.LeftShift;
     [SerializeField] private KeyCode crouchKey = KeyCode.C;
-    [SerializeField] private KeyCode interactKey = KeyCode.Mouse0;
 
     [Header("Movement Parameters")]
     [SerializeField] private float walkSpeed = 3;
@@ -70,14 +68,12 @@ public class PlayerMovement : MonoBehaviour
 
     private float rotationX = 0;
 
-    [Header("Interaction")]
-    [SerializeField] private Vector3 interactionRayPoint = default;
-    [SerializeField] private float interactionDistance = default;
-    [SerializeField] private LayerMask interactionLayer = default;
-    private Interactible currentInteractible;
+    public static PlayerMovement instance;
 
     private void Awake()
     {
+        instance = this;
+
         playerCam = GetComponentInChildren<Camera>();
         characterController = GetComponent<CharacterController>();
         defaultYPos = playerCam.transform.localPosition.y;
@@ -98,11 +94,7 @@ public class PlayerMovement : MonoBehaviour
                 HandleHeadBob();
             if(useStamin)
                 HandleStamina();
-            if(canInteract)
-            {
-                HandleInteractionCheck();
-                HandlInteractionInput();
-            }
+
             ApplyFinalMovement();
         }
     }
@@ -167,33 +159,6 @@ public class PlayerMovement : MonoBehaviour
         }
         if(!isSpinting && currentStamina < maxStamina && regenirateStamina == null)
             regenirateStamina = StartCoroutine(RegenerateStamina());
-    }
-
-    private void HandleInteractionCheck()
-    {
-        if(Physics.Raycast(playerCam.ViewportPointToRay(interactionRayPoint), out RaycastHit hit, interactionDistance))
-        {
-            if(hit.collider.gameObject.layer == 6 && (currentInteractible == null || hit.collider.gameObject.GetInstanceID() != currentInteractible.GetInstanceID()))
-            {
-                hit.collider.TryGetComponent(out currentInteractible);
-
-                if(currentInteractible)
-                    currentInteractible.OnFocus();
-            }
-        }
-        else if(currentInteractible)
-        {
-            currentInteractible.OnLoseFocus();
-            currentInteractible = null;
-        }
-    }
-
-    private void HandlInteractionInput()
-    {
-        if(Input.GetKey(interactKey) && currentInteractible != null && Physics.Raycast(playerCam.ViewportPointToRay(interactionRayPoint), out RaycastHit hit, interactionDistance, interactionLayer))
-        {
-            currentInteractible.OnInteract();
-        }
     }
 
     private void ApplyFinalMovement()
