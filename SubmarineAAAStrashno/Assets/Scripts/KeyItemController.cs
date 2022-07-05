@@ -24,7 +24,7 @@ namespace KeySystem
         public void ObjectInteraction()
         {
 
-            if (door)
+            if(door)
                 doorObject.PlayAnimation();
             else if (key)
             {

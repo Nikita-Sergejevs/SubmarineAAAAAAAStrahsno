@@ -7,17 +7,19 @@ namespace KeySystem
     public class KeyDoorController : MonoBehaviour
     {
         private bool doorOpen = false;
+        private bool otherDoor = false;
 
         [Header("Animation Name")]
         [SerializeField] private KeyInventory _keyInventory = null;
 
         [SerializeField] private int waitTimer = 1;
         [SerializeField] private bool pauseInteraction = false;
-
+        [SerializeField] private GameObject door;
         private void Awake()
         {
             doorOpen = false;
-
+            if(door)
+                otherDoor = true;
         }
 
         private void Update()
@@ -48,6 +50,10 @@ namespace KeySystem
                     doorOpen = false;
                     StartCoroutine(PauseDoorInteraction());
 
+                }
+                if(otherDoor)
+                {
+                    door.SetActive(false);
                 }
             }
         }
