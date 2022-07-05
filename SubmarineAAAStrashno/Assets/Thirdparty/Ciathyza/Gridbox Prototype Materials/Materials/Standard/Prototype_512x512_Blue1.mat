@@ -287,7 +287,7 @@ Material:
     - _SSRefractionProjectionModel: 0
     - _SampleGI: 0
     - _Shininess: 0
-    - _Smoothness: 0.5
+    - _Smoothness: 0
     - _SmoothnessRemapMax: 1
     - _SmoothnessRemapMin: 0
     - _SmoothnessSource: 1

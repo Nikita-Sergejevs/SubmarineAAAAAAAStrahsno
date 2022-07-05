@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace KeySystem
+namespace ItemSystem
 {
     public class KeyRaycast : MonoBehaviour
     {
@@ -12,7 +12,7 @@ namespace KeySystem
         [SerializeField] private string excluseLayerMask = null;
 
         private KeyItemController raycastObject;
-        [SerializeField] private KeyCode openDoorKey = KeyCode.Mouse0;
+        [SerializeField] private KeyCode KinteractKeyKode = KeyCode.Mouse0;
 
         private string interactableTag = "InteractiveObject";
         private bool isCrosshairActive;
@@ -25,25 +25,32 @@ namespace KeySystem
 
             int mask = 1 << LayerMask.NameToLayer(excluseLayerMask) | layerMaskInteract.value;
 
-            if(Physics.Raycast(transform.position, fwd, out hit, rayLenghy, mask))
+            if (Physics.Raycast(transform.position, fwd, out hit, rayLenghy, mask))
             {
-                if(hit.collider.CompareTag(interactableTag))
-                { 
-                    if(!doOnce)
+                if (hit.collider.CompareTag(interactableTag))
+                {
+                    if (!doOnce)
                     {
                         raycastObject = hit.collider.gameObject.GetComponent<KeyItemController>();
+
+                        if (Input.GetKeyDown(KinteractKeyKode))
+                        {
+                            raycastObject.ObjectInteraction();
+                        }
                     }
 
                     isCrosshairActive = true;
                     doOnce = true;
 
-                    if(Input.GetKeyDown(openDoorKey))
+                    if (Input.GetKeyDown(KinteractKeyKode))
+                    {
                         raycastObject.ObjectInteraction();
+                    }
                 }
             }
             else
             {
-                if(isCrosshairActive)
+                if (isCrosshairActive)
                     doOnce = false;
             }
         }

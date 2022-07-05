@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace KeySystem
+namespace ItemSystem
 {
     public class KeyItemController : MonoBehaviour
     {
@@ -23,7 +23,6 @@ namespace KeySystem
 
         public void ObjectInteraction()
         {
-
             if(door)
                 doorObject.PlayAnimation();
             else if (key)
